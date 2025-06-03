@@ -1,0 +1,144 @@
+name: build and containerize
+
+on:
+  push:
+    branches:
+    - main
+    paths:
+    - src/main/**
+    - Dockerfile
+    - pom.xml
+  pull_request:
+    branches:
+    - main
+    paths:
+    - src/main/**
+    - Dockerfile
+    - pom.xml
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-southeast-2
+  ECR_REPO_NAME: cjaydevops/user-management
+  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  CD_REPO: git@github.com:Cjay13/user-management-cd.git
+  CD_BRANCH: main
+  VALUES_FILE: user-management-helm/values.yaml
+  
+
+jobs:
+  build:
+    name: Build and Sonar Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache local Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Build with Maven
+        run: mvn clean install -DskipTests
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v5.0.0
+        with:
+          projectBaseDir: .
+          args: >
+            -Dsonar.organization=cjay-practice-projects
+            -Dsonar.projectKey=cjay-practice-projects_ecom-usermanagement
+            -Dsonar.python.coverage.reportPaths=coverage.xml
+            -Dsonar.sources=src/main/java
+            -Dsonar.java.binaries=target/classes
+            -Dsonar.tests=src/test/java
+            -Dsonar.test.exclusions=tests/**
+            -Dsonar.verbose=true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set ECR Registry 
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: echo "REGISTRY=$REGISTRY" >> $GITHUB_ENV
+
+      - name: Set Commit SHA
+        run: echo "COMMIT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Docker Build
+        run: |
+          docker build -t $REGISTRY/$ECR_REPO_NAME:$COMMIT_SHA .
+
+      - name: debug
+        run: docker images
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: "${{ env.REGISTRY }}/${{ env.ECR_REPO_NAME }}:${{ env.COMMIT_SHA }}"
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Push Docker image to Amazon ECR
+        run: |
+          docker push $REGISTRY/$ECR_REPO_NAME:$COMMIT_SHA
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          ls -a ~/.ssh
+          echo "${{ secrets.SSH_PVT_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Update values.yaml
+        run: |
+  
+          IMAGE_TAG=$COMMIT_SHA
+                  
+          git clone $CD_REPO cd-repo
+          cd cd-repo
+          
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+          sed -i "s|tag: .*|tag: \"${IMAGE_TAG}\"|" $VALUES_FILE
+
+          git add $VALUES_FILE
+          git commit -m "Updated image tag to ${IMAGE_TAG}"
+          git push origin $CD_BRANCH
+        
+
+          
+          
+          
+        
