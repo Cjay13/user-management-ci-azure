@@ -93,7 +93,7 @@ jobs:
 
       - name: Docker Build
         run: |
-          docker build -t ${{ env.ACR_NAME }}.azureacr.io/${{ env.IMAGE_NAME }}:${{ env.COMMIT_SHA }} .
+          docker build -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ env.COMMIT_SHA }} .
 
       - name: debug
         run: docker images
@@ -101,7 +101,7 @@ jobs:
       # - name: Run Trivy vulnerability scanner
       #   uses: aquasecurity/trivy-action@0.28.0
       #   with:
-      #     image-ref: "${{ env.ACR_NAME }}.azureacr.io/${{ env.IMAGE_NAME }}:${{ env.COMMIT_SHA }}"
+      #     image-ref: "${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ env.COMMIT_SHA }}"
       #     format: 'table'
       #     exit-code: '1'
       #     ignore-unfixed: true
@@ -113,7 +113,7 @@ jobs:
 
       - name: Push Docker image to ACR
         run: |
-          docker push ${{ env.ACR_NAME }}.azureacr.io/${{ env.IMAGE_NAME }}:${{ env.COMMIT_SHA }}
+          docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ env.COMMIT_SHA }}
 
       # - name: Setup SSH Key
       #   run: |
