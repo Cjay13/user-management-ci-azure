@@ -108,6 +108,9 @@ jobs:
       #     vuln-type: 'os,library'
       #     severity: 'CRITICAL,HIGH'
 
+      - name: DNS Lookup ACR
+        run: nslookup ${{ env.ACR_NAME }}.azurecr.io
+
       - name: Push Docker image to ACR
         run: |
           docker push ${{ env.ACR_NAME }}.azureacr.io/${{ env.IMAGE_NAME }}:${{ env.COMMIT_SHA }}
