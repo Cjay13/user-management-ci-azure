@@ -63,9 +63,9 @@
     			<version>1.12.782</version>
 		</dependency>
 		<dependency>
-    		<groupId>com.azure.spring</groupId>
-    		<artifactId>spring-cloud-azure-starter-active-directory</artifactId>
-    		<version>4.2.0</version>
+			<groupId>com.azure.spring</groupId>
+			<artifactId>spring-cloud-azure-starter-active-directory</artifactId>
+			<version>5.22.0</version>
 		</dependency>
 		<dependency>
     		<groupId>com.azure.spring</groupId>
